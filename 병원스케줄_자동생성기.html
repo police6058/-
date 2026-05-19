@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>병원 스케줄 자동 생성기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    background: #f0f4f8;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+    color: #1a2332;
+  }
+  .app {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1a2332;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    font-size: 0.9rem;
+    color: #6b7a8d;
+    margin-top: 0.4rem;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+  }
+  .card h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a2332;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 span.icon {
+    width: 28px; height: 28px;
+    background: #2E75B6;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 0.9rem;
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-group label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #4a5568;
+  }
+  .form-group input, .form-group select {
+    padding: 0.55rem 0.75rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    color: #1a2332;
+    background: #fff;
+    transition: border-color 0.15s;
+    outline: none;
+    font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus {
+    border-color: #2E75B6;
+  }
+  .holiday-list { display: flex; flex-direction: column; gap: 8px; }
+  .holiday-item {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .holiday-item input[type="date"] {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: #1a2332;
+    outline: none;
+    font-family: inherit;
+  }
+  .holiday-item input[type="date"]:focus { border-color: #2E75B6; }
+  .holiday-item input[type="text"] {
+    width: 160px;
+    padding: 0.5rem 0.75rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: #1a2332;
+    outline: none;
+    font-family: inherit;
+  }
+  .holiday-item input[type="text"]:focus { border-color: #2E75B6; }
+  .btn-remove {
+    width: 28px; height: 28px;
+    border: none; background: #fee2e2;
+    color: #dc2626; border-radius: 8px;
+    cursor: pointer; font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .btn-remove:hover { background: #fecaca; }
+  .btn-add {
+    padding: 0.45rem 1rem;
+    border: 1.5px dashed #cbd5e0;
+    background: transparent;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    color: #6b7a8d;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    margin-top: 4px;
+    width: 100%;
+  }
+  .btn-add:hover { border-color: #2E75B6; color: #2E75B6; background: #EBF4FF; }
+  .notice {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    color: #92400e;
+    margin-top: 0.5rem;
+  }
+  .btn-generate {
+    width: 100%;
+    padding: 1rem;
+    background: #2E75B6;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: -0.3px;
+    transition: all 0.15s;
+    margin-top: 0.5rem;
+  }
+  .btn-generate:hover { background: #1e5a96; transform: translateY(-1px); }
+  .btn-generate:active { transform: translateY(0); }
+  .btn-generate:disabled { background: #a0aec0; cursor: not-allowed; transform: none; }
+  .result-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    display: none;
+  }
+  .result-card.show { display: block; }
+  .result-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+  .team-stat {
+    border-radius: 10px;
+    padding: 0.75rem;
+    text-align: center;
+  }
+  .team-stat .name { font-size: 1.1rem; font-weight: 700; }
+  .team-stat .count { font-size: 0.8rem; margin-top: 2px; }
+  .preview-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .preview-table th, .preview-table td {
+    border: 1px solid #e2e8f0;
+    padding: 5px 8px;
+    text-align: center;
+  }
+  .preview-table th { background: #f8fafc; font-weight: 600; color: #4a5568; }
+  .cell-A { background: #B3D9FF; color: #0C447C; font-weight: 600; }
+  .cell-B { background: #FFE0B3; color: #633806; font-weight: 600; }
+  .cell-C { background: #D4EDDA; color: #173404; font-weight: 600; }
+  .cell-D { background: #FFD6D6; color: #501313; font-weight: 600; }
+  .cell-none { background: #f1f5f9; color: #94a3b8; font-size: 0.75rem; }
+  .cell-hol  { background: #FFE4E4; color: #dc2626; font-weight: 600; font-size: 0.75rem; }
+  .week-header td { background: #2E75B6; color: white; font-weight: 700; font-size: 0.82rem; }
+  .week-header-hol td { background: #dc2626; color: white; font-weight: 700; font-size: 0.82rem; }
+  .day-header td { background: #EBF4FF; color: #2E75B6; font-weight: 600; font-size: 0.75rem; }
+  .time-label { background: #f8fafc; color: #6b7a8d; font-size: 0.75rem; }
+  .btn-download {
+    width: 100%;
+    padding: 0.85rem;
+    background: #16a34a;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 1rem;
+    transition: all 0.15s;
+  }
+  .btn-download:hover { background: #15803d; transform: translateY(-1px); }
+  .scroll-preview { max-height: 420px; overflow-y: auto; border-radius: 8px; border: 1px solid #e2e8f0; }
+  .gap-row td { height: 6px; background: #f8fafc; border: none; }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .tag-hol { background: #fee2e2; color: #dc2626; }
+  .tag-sat { background: #fef3c7; color: #92400e; }
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .result-summary { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>🏥 병원 스케줄 자동 생성기</h1>
+    <p>팀 수, 기간, 공휴일을 입력하면 균등 배분 스케줄을 자동으로 만들어 드려요</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="icon">⚙</span> 기본 설정</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>팀 개수</label>
+        <select id="teamCount">
+          <option value="4" selected>4팀 (A·B·C·D)</option>
+          <option value="3">3팀 (A·B·C)</option>
+          <option value="5">5팀 (A·B·C·D·E)</option>
+          <option value="6">6팀 (A·B·C·D·E·F)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>팀 이름 (쉼표 구분, 선택)</label>
+        <input type="text" id="teamNames" placeholder="예: A,B,C,D  (비워두면 자동)">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>시작일</label>
+        <input type="date" id="startDate" value="2026-05-25">
+      </div>
+      <div class="form-group">
+        <label>종료일</label>
+        <input type="date" id="endDate" value="2026-12-31">
+      </div>
+    </div>
+    <div class="notice">
+      💡 스케줄 규칙: 월·화·목은 오전2팀+오후2팀 / 수·금·토는 오전2팀만 / 금·토 오후 없음
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="icon">📅</span> 공휴일 설정</h2>
+    <div class="holiday-list" id="holidayList"></div>
+    <button class="btn-add" onclick="addHoliday()">+ 공휴일 추가</button>
+    <div class="notice" style="margin-top:0.75rem">
+      ⚠️ 토요일 공휴일은 스케줄에 영향 없음 / 평일 공휴일만 해당 날 슬롯이 '휴일'로 처리됩니다
+    </div>
+  </div>
+
+  <button class="btn-generate" id="generateBtn" onclick="generate()">📊 스케줄 생성하기</button>
+
+  <div class="result-card" id="resultCard" style="margin-top:1rem">
+    <h2 style="margin-bottom:1rem"><span class="icon">✅</span> 생성 완료</h2>
+    <div class="result-summary" id="teamStats"></div>
+    <div class="scroll-preview" id="previewArea"></div>
+    <button class="btn-download" onclick="downloadExcel()">📥 엑셀 파일 다운로드</button>
+  </div>
+</div>
+
+<script>
+const DEFAULT_HOLIDAYS = [
+  {date:'2026-06-06', name:'현충일(토)'},
+  {date:'2026-08-15', name:'광복절(토)'},
+  {date:'2026-09-24', name:'추석연휴(목)'},
+  {date:'2026-09-25', name:'추석(금)'},
+  {date:'2026-09-26', name:'추석연휴(토)'},
+  {date:'2026-10-03', name:'개천절(토)'},
+  {date:'2026-10-09', name:'한글날(금)'},
+  {date:'2026-12-25', name:'크리스마스(금)'},
+];
+
+const TEAM_COLORS_HEX = ['#B3D9FF','#FFE0B3','#D4EDDA','#FFD6D6','#E8D5FF','#FFE0E8'];
+const TEAM_TEXT_HEX   = ['#0C447C','#633806','#173404','#501313','#3C3489','#720028'];
+const CELL_CLASSES    = ['cell-A','cell-B','cell-C','cell-D','cell-E','cell-F'];
+const DAYS_KR = ['월','화','수','목','금','토'];
+
+let scheduleData = null;
+
+function addHoliday(date='', name='') {
+  const list = document.getElementById('holidayList');
+  const div = document.createElement('div');
+  div.className = 'holiday-item';
+  div.innerHTML = `
+    <input type="date" value="${date}" placeholder="날짜">
+    <input type="text" value="${name}" placeholder="이름 (예: 추석)">
+    <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+  `;
+  list.appendChild(div);
+}
+
+function getHolidays() {
+  const items = document.querySelectorAll('.holiday-item');
+  const result = {};
+  items.forEach(item => {
+    const d = item.querySelector('input[type="date"]').value;
+    const n = item.querySelector('input[type="text"]').value || '공휴일';
+    if (d) result[d] = n;
+  });
+  return result;
+}
+
+function getTeams() {
+  const count = parseInt(document.getElementById('teamCount').value);
+  const names = document.getElementById('teamNames').value.trim();
+  if (names) {
+    const arr = names.split(',').map(s=>s.trim()).filter(Boolean);
+    if (arr.length >= count) return arr.slice(0, count);
+  }
+  return 'ABCDEFGHIJ'.slice(0,count).split('');
+}
+
+function dateToStr(d) {
+  return d.toISOString().slice(0,10);
+}
+
+function strToDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y,m-1,d);
+}
+
+function addDays(d, n) {
+  const r = new Date(d); r.setDate(r.getDate()+n); return r;
+}
+
+function makeBasePattern(teams) {
+  const n = teams.length;
+  if (n === 4) {
+    const [A,B,C,D] = teams;
+    return [
+      {월:{오전:[A,B],오후:[C,D]},화:{오전:[C,D],오후:[A,B]},수:{teams:[A,C]},목:{오전:[A,C],오후:[B,D]},금:{오전:[B,D]},토:{오전:[A,B]}},
+      {월:{오전:[C,D],오후:[A,B]},화:{오전:[A,B],오후:[C,D]},수:{teams:[B,D]},목:{오전:[B,D],오후:[A,C]},금:{오전:[A,C]},토:{오전:[C,D]}},
+      {월:{오전:[B,D],오후:[A,C]},화:{오전:[A,C],오후:[B,D]},수:{teams:[A,B]},목:{오전:[A,B],오후:[C,D]},금:{오전:[C,D]},토:{오전:[B,D]}},
+      {월:{오전:[A,C],오후:[B,D]},화:{오전:[B,D],오후:[A,C]},수:{teams:[C,D]},목:{오전:[C,D],오후:[A,B]},금:{오전:[A,B]},토:{오전:[A,C]}},
+    ];
+  }
+  // 범용: 팀 수에 맞게 자동 조합
+  // 오전/오후 각 2팀, 수/금/토 2팀
+  // 팀 쌍을 순열로 순환
+  const patterns = [];
+  const n_pat = Math.max(n, 4);
+  for (let p = 0; p < n_pat; p++) {
+    const rot = (arr, k) => { const a=[...arr]; for(let i=0;i<k;i++) a.push(a.shift()); return a; };
+    const t = rot(teams, p % n);
+    const am1 = [t[0%n], t[1%n]];
+    const pm1 = [t[2%n], t[3%n]];
+    const am2 = [t[2%n], t[3%n]];
+    const pm2 = [t[0%n], t[1%n]];
+    const wed = [t[0%n], t[2%n]];
+    const fri = [t[1%n], t[3%n]];
+    const sat = [t[0%n], t[1%n]];
+    patterns.push({
+      월:{오전:am1,오후:pm1},화:{오전:am2,오후:pm2},
+      수:{teams:wed},목:{오전:am1,오후:pm1},
+      금:{오전:fri},토:{오전:sat}
+    });
+  }
+  return patterns;
+}
+
+function getSlots(daySched, dk) {
+  if (dk==='수') {
+    const t=daySched.teams;
+    return [['오전',t[0]],['오전',t[1]],['없음',null],['없음',null]];
+  } else if (dk==='금'||dk==='토') {
+    const t=daySched['오전'];
+    return [['오전',t[0]],['오전',t[1]],['없음',null],['없음',null]];
+  } else {
+    const am=daySched['오전'],pm=daySched['오후'];
+    return [['오전',am[0]],['오전',am[1]],['오후',pm[0]],['오후',pm[1]]];
+  }
+}
+
+function generate() {
+  const startStr = document.getElementById('startDate').value;
+  const endStr   = document.getElementById('endDate').value;
+  if (!startStr || !endStr) { alert('시작일과 종료일을 입력해주세요'); return; }
+
+  const start = strToDate(startStr);
+  const end   = strToDate(endStr);
+  if (start.getDay() !== 1) { alert('시작일은 월요일이어야 해요'); return; }
+  if (end < start) { alert('종료일이 시작일보다 빠릅니다'); return; }
+
+  const teams = getTeams();
+  const holidays = getHolidays();
+  const basePat = makeBasePattern(teams);
+  const patLen = basePat.length;
+
+  // 4팀일 때 로테이션 (blk별 팀 순서 바꾸기)
+  const ROTATIONS_4 = [
+    [0,1,2,3],[1,2,3,0],[2,3,0,1],[3,0,1,2]
+  ];
+
+  // 총 주수 계산
+  const weeks = [];
+  let mon = new Date(start);
+  let wkIdx = 0;
+  while (mon <= end) {
+    const dates = DAYS_KR.map((_,i) => {
+      const d = addDays(mon, i);
+      return d <= end ? d : null;
+    });
+
+    // 패턴 선택
+    let patIdx;
+    if (teams.length === 4) {
+      const blk = Math.floor(wkIdx / 4);
+      const rot = ROTATIONS_4[blk % 4];
+      const inBlk = wkIdx % 4;
+      // 로테이션된 팀 순서로 패턴 재구성
+      const rotTeams = rot.map(i => teams[i]);
+      const rotPat = makeBasePattern(rotTeams);
+      patIdx = inBlk;
+      weeks.push({dates, sched: rotPat[patIdx], wkNum: wkIdx+1});
+    } else {
+      patIdx = wkIdx % patLen;
+      weeks.push({dates, sched: basePat[patIdx], wkNum: wkIdx+1});
+    }
+    mon = addDays(mon, 7);
+    wkIdx++;
+  }
+
+  // 4팀 균형 보정 (1주차 토요일)
+  if (teams.length === 4 && weeks.length > 0) {
+    weeks[0].sched = JSON.parse(JSON.stringify(weeks[0].sched));
+    weeks[0].sched['토']['오전'] = [teams[0], teams[2]];
+  }
+
+  // 누적 계산
+  const cumul = {};
+  teams.forEach(t => cumul[t]=0);
+  const weekStats = [];
+
+  weeks.forEach(wk => {
+    const wkCount = {};
+    teams.forEach(t => wkCount[t]=0);
+    DAYS_KR.forEach((dk, i) => {
+      const dt = wk.dates[i];
+      if (!dt) return;
+      const dtStr = dateToStr(dt);
+      const hname = holidays[dtStr];
+      const isSat = (dk === '토');
+      // 평일 공휴일만 영향
+      if (hname && !isSat) return;
+      const slots = getSlots(wk.sched[dk], dk);
+      slots.forEach(([kind, team]) => {
+        if (team) { cumul[team]++; wkCount[team]++; }
+      });
+    });
+    const snap = {...cumul};
+    const vals = Object.values(snap);
+    weekStats.push({...wk, cumul: snap, gap: Math.max(...vals)-Math.min(...vals), wkCount});
+  });
+
+  scheduleData = {weeks, weekStats, teams, holidays, cumul};
+  renderResult(scheduleData);
+}
+
+function renderResult({weeks, weekStats, teams, holidays, cumul}) {
+  const statsDiv = document.getElementById('teamStats');
+  const total = Object.values(cumul).reduce((a,b)=>a+b,0);
+  statsDiv.innerHTML = teams.map((t,i) => `
+    <div class="team-stat" style="background:${TEAM_COLORS_HEX[i]};color:${TEAM_TEXT_HEX[i]}">
+      <div class="name">${t}팀</div>
+      <div class="count">${cumul[t]}회</div>
+    </div>
+  `).join('');
+
+  const preview = document.getElementById('previewArea');
+  let html = '<table class="preview-table">';
+
+  weekStats.forEach(wk => {
+    const hasAffect = DAYS_KR.some((dk,i) => {
+      const dt=wk.dates[i];
+      if(!dt) return false;
+      const dtStr=dateToStr(dt);
+      return holidays[dtStr] && dk!=='토';
+    });
+    const hasSat = DAYS_KR.some((dk,i) => {
+      const dt=wk.dates[i];
+      if(!dt) return false;
+      return holidays[dateToStr(dt)] && dk==='토';
+    });
+
+    const hTag = hasAffect ? '<span class="tag tag-hol">⚠️ 공휴일</span>'
+               : hasSat   ? '<span class="tag tag-sat">📌 토 공휴일</span>' : '';
+
+    html += `<tr class="${hasAffect?'week-header-hol':'week-header'}">
+      <td colspan="${2+DAYS_KR.length}">${wk.wkNum}주차${hTag}&nbsp;&nbsp;
+      누적: ${teams.map(t=>`${t}:${wk.cumul[t]}`).join(' | ')} &nbsp; (차이:${wk.gap})</td></tr>`;
+
+    html += '<tr class="day-header"><td class="time-label">구분</td>';
+    DAYS_KR.forEach((dk,i) => {
+      const dt = wk.dates[i];
+      const dtStr = dt ? dateToStr(dt) : '';
+      const hname = dt && holidays[dtStr];
+      const label = dt ? `${dk}<br><small>${dt.getMonth()+1}/${dt.getDate()}</small>` : dk;
+      const bg = hname && dk!=='토' ? '#ffe4e4' : (hname ? '#fff8e1' : '');
+      html += `<td style="${bg?'background:'+bg:''}">${label}</td>`;
+    });
+    html += '</tr>';
+
+    const rows = [['오전',0],['오전',1],['오후',2],['오후',3]];
+    rows.forEach(([label, slotIdx]) => {
+      html += `<tr><td class="time-label">${label}</td>`;
+      DAYS_KR.forEach((dk,i) => {
+        const dt = wk.dates[i];
+        if (!dt) { html += `<td class="cell-none">-</td>`; return; }
+        const dtStr = dateToStr(dt);
+        const hname = holidays[dtStr];
+        const isSat = dk==='토';
+        if (hname && !isSat) { html += `<td class="cell-hol">휴일</td>`; return; }
+        const slots = getSlots(wk.sched[dk], dk);
+        const [kind, team] = slots[slotIdx];
+        if (!team || kind==='없음') { html += `<td class="cell-none">없음</td>`; return; }
+        const ti = teams.indexOf(team);
+        html += `<td class="${CELL_CLASSES[ti]||'cell-A'}">${team}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '<tr class="gap-row"><td colspan="8"></td></tr>';
+  });
+
+  html += '</table>';
+  preview.innerHTML = html;
+  document.getElementById('resultCard').classList.add('show');
+}
+
+function downloadExcel() {
+  if (!scheduleData) return;
+  const {weeks, weekStats, teams, holidays, cumul} = scheduleData;
+
+  const wb = XLSX.utils.book_new();
+
+  // 시트1: 스케줄
+  const ws1data = [];
+  const merges1 = [];
+  let row = 0;
+
+  weekStats.forEach(wk => {
+    const hasAffect = DAYS_KR.some((dk,i) => {
+      const dt=wk.dates[i]; if(!dt) return false;
+      return holidays[dateToStr(dt)] && dk!=='토';
+    });
+
+    // 주차 타이틀
+    const titleRow = [`${wk.wkNum}주차${hasAffect?' ⚠️ 공휴일':''}`,'','','','','','',''];
+    ws1data.push(titleRow);
+    merges1.push({s:{r:row,c:0},e:{r:row,c:7}});
+    row++;
+
+    // 날짜 헤더
+    const dateRow = [''];
+    DAYS_KR.forEach((dk,i) => {
+      const dt=wk.dates[i];
+      dateRow.push(dt ? `${dk} ${dt.getMonth()+1}/${dt.getDate()}` : dk);
+    });
+    ws1data.push(dateRow); row++;
+
+    // 4행 데이터
+    const labels=['오전','오전','오후','오후'];
+    for(let s=0;s<4;s++) {
+      const dataRow = [labels[s]];
+      DAYS_KR.forEach((dk,i) => {
+        const dt=wk.dates[i];
+        if(!dt) { dataRow.push('-'); return; }
+        const dtStr=dateToStr(dt);
+        const hname=holidays[dtStr];
+        if(hname && dk!=='토') { dataRow.push('휴일'); return; }
+        const slots=getSlots(wk.sched[dk],dk);
+        const [kind,team]=slots[s];
+        dataRow.push(kind==='없음'||!team?'없음':team);
+      });
+      ws1data.push(dataRow); row++;
+    }
+    ws1data.push([]); row++;
+  });
+
+  const ws1 = XLSX.utils.aoa_to_sheet(ws1data);
+  ws1['!merges'] = merges1;
+  ws1['!cols'] = [{wch:8},...DAYS_KR.map(()=>({wch:12}))];
+  XLSX.utils.book_append_sheet(wb, ws1, '스케줄');
+
+  // 시트2: 누적 카운터
+  const ws2data = [
+    ['주차','기간',...teams.map(t=>`${t}팀`),'최대-최소','비고']
+  ];
+  weekStats.forEach(wk => {
+    const valid=wk.dates.filter(Boolean);
+    const period=valid.length?`${valid[0].getMonth()+1}/${valid[0].getDate()}~${valid[valid.length-1].getMonth()+1}/${valid[valid.length-1].getDate()}`:'';
+    const hasAffect=DAYS_KR.some((dk,i)=>{
+      const dt=wk.dates[i];if(!dt)return false;
+      return holidays[dateToStr(dt)]&&dk!=='토';
+    });
+    ws2data.push([
+      `${wk.wkNum}주차`, period,
+      ...teams.map(t=>wk.cumul[t]),
+      wk.gap,
+      hasAffect?'⚠️ 공휴일 주':''
+    ]);
+  });
+  ws2data.push(['합계','',...teams.map(t=>cumul[t]),Math.max(...Object.values(cumul))-Math.min(...Object.values(cumul)),'']);
+
+  const ws2 = XLSX.utils.aoa_to_sheet(ws2data);
+  ws2['!cols'] = [{wch:8},{wch:14},...teams.map(()=>({wch:8})),{wch:10},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws2, '누적 카운터');
+
+  const start = document.getElementById('startDate').value.replace(/-/g,'').slice(2);
+  const end   = document.getElementById('endDate').value.replace(/-/g,'').slice(2);
+  XLSX.writeFile(wb, `병원스케줄_${start}_${end}.xlsx`);
+}
+
+// 초기 공휴일 로드
+window.onload = () => {
+  DEFAULT_HOLIDAYS.forEach(h => addHoliday(h.date, h.name));
+};
+</script>
+</body>
+</html>
